@@ -15,5 +15,13 @@ $FileServer = ""
 #Put the top of the folder structure here, for example D:\Share the script will recursively scan anything beneath this.
 $FolderLocation = ""
 
+#Mail Information, self explanatory
+
+$MailServer = ""
+$MailRecipient = ""
+$MailFrom = ""
+$MailSubject = ""
+$Mailpriority = ""
+#
 
 Get-Acl -Path "S:\Group\IT" | select -ExpandProperty Access
