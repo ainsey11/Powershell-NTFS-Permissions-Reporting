@@ -1,127 +1,41 @@
-﻿<#
-.Synopsis
-   Gets a list of folders within a share that have individual user permissions set, rather than the approved role groups from within AD
-.EXAMPLE
-    .\Get-NonGroupPermissions.ps1 -Path '\\server\share\path' -Domain acmecorp -OutputFilepath C:\Temp\Test.csv -Email -To reciever@acme.com -From sender@acme.com -SmtpServer smtp.acme.com -Subject 'Test email' -Verbose
-.NOTES
-    Author - Robert Ainsworth - https://ainsey11.com
-    Contributor - Shawn Esterman - https://github.com/ShawnEsterman
-#>
+﻿############################
+# Name : Get-NonGroupPermissions.ps1
+# Function: Gets a list of folders within a share that have individual user permissions set, 
+# rather than the approved role groups from within AD
+#
+# Author - Robert Ainsworth - https://ainsey11.com
 
-[CmdletBinding()]
-Param (
-    [Parameter(Mandatory = $true,
-               ValueFromPipeline = $true,
-               ValueFromPipelineByPropertyName = $true)]
-    [ValidateScript({ $_ | ForEach-Object -Process { Test-Path -Path $_ } })]
-    [String[]]
-    $Path,
-    [Parameter(Mandatory = $true)]
-    [String]
-    $Domain = "acme.com",
-    [String]
-    $OutputFilepath = "C:\Support\FoldersWithIndividualAccess.csv",
-    [Parameter(Mandatory = $true, 
-               ParameterSetName = 'Email')]
-    [Switch]
-    $Email,
-    [Parameter(ParameterSetName = 'Email')]
-    [ValidateScript({ $_ | ForEach-Object -Process { try { New-Object System.Net.Mail.MailAddress($_) } catch { return $false } }; return $true })]
-    [String[]]
-    $To = 'defaultto@acme.com',
-    [Parameter(ParameterSetName = 'Email')]
-    [ValidateScript({ try { New-Object System.Net.Mail.MailAddress($_); return $true } catch { return $false } })]
-    [String]
-    $From = 'defaultfrom@acme.com',
-    [Parameter(ParameterSetName = 'Email')]
-    $SmtpServer = 'defaultsmtp.acme.com',
-    [Parameter(ParameterSetName = 'Email')]
-    $Subject = "Files and Folders found with individual permissions assigned"
-)
 
-$PreContent = @"
-<!DOCTYPE html>
-<html lang="en">
-<head>
-<style>
-body {
-    color: #373a3c;
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Roboto", "Oxygen", "Ubuntu", "Cantarell", "Fira Sans", "Droid Sans", "Helvetica Neue", Helvetica, Arial, sans-serif;
-    font-size: 16px;
-}
-a {
-    color: #d9534f;
-}
-table {
-	border-width: 1px;
-	border-color: #eceeef;
-	border-collapse: collapse;
-}
-th,
-td {
-    border-color: #eceeef;
-    border-style: solid;
-    border-width: 1px;
-    padding: 8px;
-}
-th {
-	background-color: #337ab7;
-}
-td {
-	background-color: transparent;
-}
-</style>
-</head>
-<body>
-"@
+# Setting variables
+$EmailFrom = "#"
+$EmailTo = "#"
+$EmailServer = "#"
+$EmailSubjectLine = "Files and Folders found with individual permissions assigned"
+$EMailBody = " Individual Permissions have been detected, please see attached file and resolve as soon as possible. This is a security incident"
+$Domain = "#"
 
-$PostContent = @"
-</body>
-</html>
-"@
+$Output = "C:\Support\FoldersWithIndividualAccess.csv"
+$Path =  "D:\Robert Public Share"
 
-$Body = $PreContent
-$Body += "<h1>$Subject</h1>"
+#this is where the magic happens!
+# Note - this will only work for usernames that are in the format firstname.lastname
+# this won't be a massive problem when we implement 0365 because all usernames will be the same format
+# but none of our groups have a "." in the names, so perfect way of excluding groups from the results
+# because groups and individual users are returned as the same property type in the powershell output
 
-$Data = @()
+get-acl $Path | select -expand access | # Gets the ACL's for the path and expands the access property
+where { $_.IdentityReference -like "$domain\*.*" } | #filters it to firstname.lastname users
+select FileSystemRights,IdentityReference,Isinherited | # gets rid of the crap I don't care about 
+export-CSV $Output #Dump this somewhere useful, because I'm lazy
 
-foreach ( $P in $Path ) {
-    Write-Verbose "Checking path $P"
-    $Data += (Get-Acl -LiteralPath $Path).Access.Where{ $_.IdentityReference -like "$domain\*.*" } |
-                Select-Object -Property FileSystemRights,IdentityReference,Isinherited |
-                ForEach-Object -Process {
-                    Write-Verbose "Found $($_.FileSystemRights) on path $($P) for $($_.IdentityReference)"
-                    [pscustomobject] @{
-                        Path = $P
-                        FileSystemRights = $_.FileSystemRights
-                        IdentityReference = $_.IdentityReference
-                        IsInherited = $_.IsInherited
-                    }
-                }
-}
+# Send an e-mail into the relevant people, the little if statement won't e-mail you if the file contains no individual permissions,
+# the acl loop will always create a 0KB file unless there are permissions, then it's larger. Hence why the below section works
+# I'll make it better one day, I promise ;)
 
-if ( $Data ) {
-    
-    if ( $OutputFilepath ) {
-        Write-Verbose "Outputting data to $OutputFilePath"
-        $Data | Export-Csv -LiteralPath $OutputFilepath -NoTypeInformation
-    }
+if( (get-item $Output).length -gt 0KB)
+{
+Send-MailMessage -From $EmailFrom -To $EmailTo -SmtpServer $EmailServer -Subject $EmailSubjectLine -Priority High -Body $EMailBody -Attachments $Output
+}    
 
-    if ( $Email ) {
-        
-        $Body += $Data | ConvertTo-Html -Fragment
-        $Body += $PostContent
-
-        $Params = @{
-            To = $To
-            From = $From
-            SmtpServer = $SmtpServer
-            Subject = $Subject
-            Priority = 'High'
-            Body = $Body
-            BodyAsHtml = $true
-        }
-        Send-MailMessage @Params
-    }
-
-}
+# Tidying it up now, nothing to see here, move along
+Remove-Item $Output
