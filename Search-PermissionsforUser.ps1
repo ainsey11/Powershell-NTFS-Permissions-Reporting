@@ -12,20 +12,13 @@ $EmailTo = "rob@timico.co.uk"
 $EmailServer = "mail.timicogroup.local"
 $EmailSubjectLine = "Files and Folders found with individual permissions assigned"
 $EMailBody
+$Paths =  "D:\Documents\"
+$Userlist = "D:\Documents\github\Poweshell-NTFS-Permissions-Reporting\Userlist.csv"
+
+Import-Module ActiveDirectory #Imports AD module
+Get-ADUser -Filter * | select Name | Export-Csv $Userlist # Gets a list of all users in Active Directory
+
+$Users = Get-Content $userlist #Gets a list of users from the above step as a variable. Dirty, but it works
 
 
-$folders = "D:\Documents\github\"
-
-foreach ($path in $paths){   
-    gci $Paths | get-acl  | %{
-    $Acl=$_
-    $_.Access|?{$_.AccessControlType -eq "Allow"}|Select -Unique IdentityReference|%{
-        [PSCustomObject]@{
-        "Path"=$ACL.PSPath.substring(38,$Acl.PSPath.Length-38); 
-        "Owner"=$ACL.Owner;
-        "Group"=$ACL.Group;
-        "Access"=$_.IdentityReference | Where-Object {$_ -like "*$Users*"} 
-        }
-    }
-} 
-}
+Remove-Item $Userlist
