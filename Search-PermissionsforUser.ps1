@@ -11,14 +11,31 @@ $EmailFrom = "thq-man01@timico.co.uk"
 $EmailTo = "rob@timico.co.uk"
 $EmailServer = "mail.timicogroup.local"
 $EmailSubjectLine = "Files and Folders found with individual permissions assigned"
-$EMailBody
-$Paths =  "D:\Documents\"
-$Userlist = "D:\Documents\github\Poweshell-NTFS-Permissions-Reporting\Userlist.csv"
+$EMailBody = " Individual Permissions have been detected, please see attached file and resolve as soon as possible. This is a security incident"
+$Domain = "TIMICOGROUP"
 
-Import-Module ActiveDirectory #Imports AD module
-Get-ADUser -Filter * | select Name | Export-Csv $Userlist # Gets a list of all users in Active Directory
+$Output = "C:\Support\FoldersWithIndividualAccess.csv"
+$Path =  "D:\Robert Public Share"
 
-$Users = Get-Content $userlist #Gets a list of users from the above step as a variable. Dirty, but it works
+#this is where the magic happens!
+# Note - this will only work for usernames that are in the format firstname.lastname
+# this won't be a massive problem when we implement 0365 because all usernames will be the same format
+# but none of our groups have a "." in the names, so perfect way of excluding groups from the results
+# because groups and individual users are returned as the same property type in the powershell output
 
+get-acl $Path | select -expand access | # Gets the ACL's for the path and expands the access property
+where { $_.IdentityReference -like "$domain\*.*" } | #filters it to firstname.lastname users
+select FileSystemRights,IdentityReference,Isinherited | # gets rid of the crap I don't care about 
+export-CSV $Output #Dump this somewhere useful, because I'm lazy
 
-Remove-Item $Userlist
+# Send an e-mail into the relevant people, the little if statement won't e-mail you if the file contains no individual permissions,
+# the acl loop will always create a 0KB file unless there are permissions, then it's larger. Hence why the below section works
+# I'll make it better one day, I promise ;)
+
+if( (get-item $Output).length -gt 0KB)
+{
+Send-MailMessage -From $EmailFrom -To $EmailTo -SmtpServer $EmailServer -Subject $EmailSubjectLine -Priority High -Body $EMailBody -Attachments $Output
+}    
+
+# Tidying it up now, nothing to see here, move along
+Remove-Item $Output
