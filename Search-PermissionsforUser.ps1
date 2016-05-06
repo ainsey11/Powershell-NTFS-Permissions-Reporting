@@ -7,12 +7,12 @@
 
 
 # Setting variables
-$EmailFrom = "thq-man01@timico.co.uk"
-$EmailTo = "rob@timico.co.uk"
-$EmailServer = "mail.timicogroup.local"
+$EmailFrom = "#"
+$EmailTo = "#"
+$EmailServer = "#"
 $EmailSubjectLine = "Files and Folders found with individual permissions assigned"
 $EMailBody = " Individual Permissions have been detected, please see attached file and resolve as soon as possible. This is a security incident"
-$Domain = "TIMICOGROUP"
+$Domain = "#"
 
 $Output = "C:\Support\FoldersWithIndividualAccess.csv"
 $Path =  "D:\Robert Public Share"
