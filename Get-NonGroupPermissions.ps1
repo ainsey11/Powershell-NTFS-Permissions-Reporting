@@ -2,7 +2,7 @@
 .Synopsis
    Gets a list of folders within a share that have individual user permissions set, rather than the approved role groups from within AD
 .EXAMPLE
-    .\Get-NonGroupPermissions.ps1 -Path '\\server\share\path' -Domain acmecorp -OutputFilepath C:\Temp\Test.csv -Email -To reciever@acme.com -From sender@acme.com -SmtpServer smtp.acme.com -Subject 'Test email' -Verbose
+    .\Get-NonGroupPermissions.ps1 -Path '\\server\share\path' -Domain acmecorp -OutputFilepath C:\Temp\Test.csv -Email -To reciever@acme.com -From sender@acme.com -SmtpServer smtp.acme.com -Subject 'Test email' -Verbose -Recurse
 .NOTES
     Author - Robert Ainsworth - https://ainsey11.com
     Contributor - Shawn Esterman - https://github.com/ShawnEsterman
@@ -19,6 +19,8 @@ Param (
     [Parameter(Mandatory = $true)]
     [String]
     $Domain = "acme.com",
+    [switch]
+    $Recurse,
     [String]
     $OutputFilepath = "C:\Support\FoldersWithIndividualAccess.csv",
     [Parameter(Mandatory = $true, 
@@ -85,7 +87,28 @@ $Body += "<h1>$Subject</h1>"
 
 $Data = @()
 
-foreach ( $P in $Path ) {
+if ($Recurse)
+   {
+   $Folderlist = get-ChildItem $Path -recurse | ?{ $_.PSIsContainer }
+foreach ( $p in $Folderlist ) {
+    Write-Verbose "Checking path $P"
+    $Data += (Get-ChildItem $Path -Recurse |Get-Acl).Access.Where{ $_.IdentityReference -like "$domain\*.*" } |
+                Select-Object -Property FileSystemRights,IdentityReference,Isinherited |
+                ForEach-Object -Process {
+                    Write-Verbose "Found $($_.FileSystemRights) on path $("$path\$Folderlist") for $($_.IdentityReference)"
+                    [pscustomobject] @{
+                        Path = "$path\$p"
+                        FileSystemRights = $_.FileSystemRights
+                        IdentityReference = $_.IdentityReference
+                        IsInherited = $_.IsInherited
+                    }
+                }
+}
+}
+
+else {
+
+    foreach ( $P in $Path ) {
     Write-Verbose "Checking path $P"
     $Data += (Get-Acl -LiteralPath $Path).Access.Where{ $_.IdentityReference -like "$domain\*.*" } |
                 Select-Object -Property FileSystemRights,IdentityReference,Isinherited |
@@ -98,6 +121,8 @@ foreach ( $P in $Path ) {
                         IsInherited = $_.IsInherited
                     }
                 }
+}
+
 }
 
 if ( $Data ) {
