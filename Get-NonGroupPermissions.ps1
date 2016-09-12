@@ -8,6 +8,8 @@
     Contributor - Shawn Esterman - https://github.com/ShawnEsterman
 #>
 
+function Get-NonGroupPermissions{
+
 [CmdletBinding()]
 Param (
     [Parameter(Mandatory = $true,
@@ -150,3 +152,6 @@ if ( $Data ) {
     }
 
 }
+}
+
+ Get-NonGroupPermissions -Path '\\timicogroup.local\dfs01' -Domain timicogroup.local -OutputFilepath C:\Temp\Test.csv -Email -To rob@timico.co.uk -From sender@timico.co.uk -SmtpServer mail.timicogroup.local -Subject 'Test email' -Verbose -Recurse
